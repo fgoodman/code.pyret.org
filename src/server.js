@@ -417,7 +417,7 @@ function start(config, onServerReady) {
   });
 
   app.get("/grade", function (req, res) {
-    req.render("grade.html");
+    res.render("grade.html");
   });
 
   var server = app.listen(config["port"]);

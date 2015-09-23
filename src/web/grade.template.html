@@ -3,74 +3,10 @@
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
   <title>code.pyret.org</title>
-  <link rel="stylesheet" href="/css/reset.css"></link>
-  <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/themes/smoothness/jquery-ui.css" />
-  <link rel="stylesheet" href="/css/codemirror.css"></link>
-  <link rel="stylesheet" href="/css/shared.css"></link>
-  <link rel="stylesheet" href="/css/editor.css"></link>
-  <link rel="icon" type="image/png" href="/img/pyret-icon.png">
 </head>
 <body>
-<div id="header">
-  <a id="logo" href="http://www.pyret.org/"></a>
-  <button id="connectButton" class="logoutOnly blueButton">Connect to Google Drive</button>
-  <div id="program-name-container" class="loginOnly">
-    <input id="program-name" type="text" placeholder="Program Name"></input>
-  </div>
-  <button id="saveButton" class="blueButton loginOnly">Save</button>
-  <div id="shareContainer"></div>
-  <div id="menu"><button class="blueButton">More ▾</a></div>
-  <div id="menuContents" style="display: none; z-index: 8990;">
-    <div id="download"><a target="_blank" href="javascript:void(0)">Download this File</a></div>
-    <div id="docs"><a target="_blank" href="http://pyret.org/docs/{{{ CURRENT_PYRET_DOCS }}}/">Documentation</a></div>
-    <div class="loginOnly" id="drive-view"><a target="_blank" href="javascript:void(0)">View Files in Drive</a></div>
-    <div id="font"><div id="font-plus">+</div><div id="font-label">Font</div><div id="font-minus">-</div></div>
-    <div id="issues"><a target="_blank" href="https://github.com/brownplt/pyret-lang/issues/new">Report an Issue</a></div>
-    <div id="discuss"><a target="_blank" href="https://groups.google.com/forum/#!forum/pyret-discuss">Discuss Pyret</a></div>
-    <div id="logout"><a href="/logout">Log out</a></div>
-  </div>
-  <span id="notification" class="notificationArea"></span>
-  <button id="breakButton" class="blueButton rhs">Stop</button>
-  <div id="runPart" class="blueButton rhs">
-    <span id="runDropdown" class="dropdown rhs">↴</span>
-    <button id="runButton" class="blueButton rhs">Run</button>
-  </div>
-  <ul id="run-dropdown-content">
-    <li id="select-run">Run</li>
-    <li id="select-tc-run">Type-check and run</li>
-  </ul>
-</div>
-<div id="toolbar"></div>
-<div id="loader"><p>Raising the masts...</p></div>
-<div id="main">
-<div id="REPL" class="replContainer">
-<div id="handle" class="ui-resizable-handle ui-resizable-w"></div>
-</div>
-<div id="help-keys">
-  <p>Press ESC to close this help window</p>
-  <ul>
-    <li><b>Ctrl-?</b> - Show this help</li>
-    <li><b>Ctrl-s</b> - Save</li>
-    <li><b>Ctrl-m</b> - Toggle maximization of the editor window</li>
-    <li><b>Ctrl-Enter</b> - Run the definitions window</li>
-  </ul>
-</div>
-<div id="doc-containment">
-<div id="doc-overlay">
-  <div id="doc-bar"><div id="doc-close">&#x2715;</div></div>
-  <div id="doc-cover"></div>
-  <div id="doc-left" class="doc-handle ui-resizable-handle ui-resizable-w"></div>
-  <div id="doc-right" class="doc-handle ui-resizable-handle ui-resizable-e"></div>
-  <div id="doc-bottom" class="doc-handle ui-resizable-handle ui-resizable-s"></div>
-  <div id="doc-se-corner" class="doc-handle ui-resizable-handle ui-resizable-se"></div>
-  <div id="doc-sw-corner" class="doc-handle ui-resizable-handle ui-resizable-sw"></div>
-</div>
-</div>
-</div>
-<div id="footer"></div>
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
-<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/jquery-ui.min.js"></script>
 <script src="/js/loader.js"></script>
 <script src="/js/url.js"></script>
 <script src="/js/q.js"></script>
@@ -164,7 +100,5 @@ if({{{ USE_STANDALONE_PYRET }}}) {
 }
 
 </script>
-<!-- <script type="text/javascript"
-        src="https://caja.appspot.com/caja.js"></script> -->
 </body>
 </html>
