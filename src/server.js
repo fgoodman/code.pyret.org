@@ -416,6 +416,10 @@ function start(config, onServerReady) {
     res.redirect("/");
   });
 
+  app.get("/grade", function (req, res) {
+    req.render("grade.html");
+  });
+
   var server = app.listen(config["port"]);
 
   onServerReady(app, server);
