@@ -6,7 +6,8 @@ function createProgramCollectionAPI(clientId, apiKey, collectionName, immediate)
   var drive;
   var SCOPE = "https://www.googleapis.com/auth/drive.file "
     + "https://spreadsheets.google.com/feeds "
-    + "https://www.googleapis.com/auth/drive.install";
+    + "https://www.googleapis.com/auth/drive.install "
+    + "https://www.googleapis.com/auth/drive.readonly";
   var FOLDER_MIME = "application/vnd.google-apps.folder";
   var BACKREF_KEY = "originalProgram";
   var PUBLIC_LINK = "pubLink";

@@ -9,7 +9,7 @@ $(function() {
     var makeFind = find.createFindModule(null);
     var runnerP = webRunner.createRunner(proxy, makeFind);
     var resultP = runnerP.then(function(runner) {
-      return runner.runString("test", "print([list: 1, 2, 3])");
+      return runner.runString("print(link(1, empty))", "test");
     });
     resultP.then(function(result) { console.log(result); });
     resultP.fail(function(exn) { console.log(exn); });

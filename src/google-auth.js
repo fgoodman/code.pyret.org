@@ -39,7 +39,8 @@ function makeAuth(config) {
         scope: "email "
              + "https://spreadsheets.google.com/feeds "
              + "https://www.googleapis.com/auth/drive.file "
-             + "https://www.googleapis.com/auth/drive.install",
+             + "https://www.googleapis.com/auth/drive.install "
+             + "https://www.googleapis.com/auth/drive.readonly",
         state: afterUrl
       });
     },
