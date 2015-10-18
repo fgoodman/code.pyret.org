@@ -246,33 +246,20 @@ function createProgramCollectionAPI(clientId, apiKey, collectionName, immediate)
         return gQ(drive.files.get({fileId: id})).then(fileBuilder);
       },
       getFileByName: function(name) {
-        return this.getAllFiles(true).then(function(files) {
+        return this.getAllFiles().then(function(files) {
           return files.filter(function(f) { return f.getName() === name });
         });
       },
       getSharedFileById: function(id) {
         return gQ(drive.files.get({fileId: id}), true).then(makeSharedFile);
       },
-      getAllFiles: function(useBuilder) {
-        var that = this;
+      getAllFiles: function() {
         return baseCollection.then(function(bc) {
-          if (useBuilder) {
-            return that.getAllFilesById(bc.id).map(fileBuilder);
-          }
-          else {
-            return that.getAllFilesById(bc.id);
-          }
-        });
-      },
-      getAllFilesById: function(id, useBuilder) {
-        return gQ(drive.files.list({ q: "trashed=false and '" + id + "' in parents" })).then(function(filesResult) {
-          if(!filesResult.items) { return []; }
-          if (useBuilder) {
+          return gQ(drive.files.list({ q: "trashed=false and '" + bc.id + "' in parents" }))
+          .then(function(filesResult) {
+            if(!filesResult.items) { return []; }
             return filesResult.items.map(fileBuilder);
-          }
-          else {
-            return filesResult.items;
-          }
+          });
         });
       },
       createFile: function(name, opts) {
@@ -332,7 +319,10 @@ function createProgramCollectionAPI(clientId, apiKey, collectionName, immediate)
       collection: baseCollection,
       reinitialize: function() {
         return Q.fcall(function() { return initialize(); });
-      }
+      },
+      gQ: gQ,
+      drive: drive,
+      fileBuilder: fileBuilder
     }
   }
 
@@ -350,7 +340,7 @@ function createProgramCollectionAPI(clientId, apiKey, collectionName, immediate)
         return gQ(
             drive.files.insert({
               resource: {
-                mimeType: FOLDER_MIME,
+                mimeType: "application/vnd.google-apps.folder",
                 title: collectionName
               }
             }));
