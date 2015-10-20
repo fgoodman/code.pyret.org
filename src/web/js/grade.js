@@ -45,26 +45,25 @@ $(function() {
 
           getFiles(id).then(function(students) {
             return Q.all(students.map(function(student) {
-              return (function(name) { // Closure for scoping name.
-                return getFiles(student.getUniqueId()).then(function(dirs) {
-                  return dirs.find(function(dir) {
-                    return dir.getName() == "submission";
-                  });
-                }).then(function(dir) {
-                  /*
-                   * TODO(fgoodman): Remove gremlin files with preprocessing
-                   * and remove this conditional (and below as well).
-                   */
-                  if (dir !== undefined)
-                    return getFiles(dir.getUniqueId());
-                  else
-                    return null;
-                }).then(function(files) {
-                  if (files)
-                    submissions[name] = files;
-                  return files;
-                })
-              })(student.getName());
+              var name = student.getName();
+              return getFiles(student.getUniqueId()).then(function(dirs) {
+                return dirs.find(function(dir) {
+                  return dir.getName() == "submission";
+                });
+              }).then(function(dir) {
+                /*
+                 * TODO(fgoodman): Remove gremlin files with preprocessing
+                 * and remove this conditional (and below as well).
+                 */
+                if (dir !== undefined)
+                  return getFiles(dir.getUniqueId());
+                else
+                  return null;
+              }).then(function(files) {
+                if (files)
+                  submissions[name] = files;
+                return files;
+              })
             }))
           }).then(function() {
             deferred.resolve(submissions);
@@ -73,11 +72,58 @@ $(function() {
           return deferred.promise;
         }
 
-        var submissionsID = "0B-_f7M_B5NMiQjFLeEo1SVBBUE0";
+        function filterSubmissions(submissions, names) {
+          return Object.keys(submissions).reduce(function(o, i) {
+            o[i] = submissions[i].reduce(function(base, file) {
+              if (names.indexOf(file.getName()) >= 0)
+                base[file.getName()] = file;
+              return base;
+            }, {});
+            return o;
+          }, {});
+        }
 
-        gatherSubmissions(submissionsID).then(function(a) {
-          console.log(a);
-        });
+        function renderSubmissions(submissions) {
+          $("#students-loading").hide();
+          var table = $("#students");
+          var tr = $("<tr>");
+          tr.append($("<th>").text("Student"));
+          $.each(names, function(_, name) {
+            tr.append($("<th>").text(name));
+          });
+          table.append($("<thead>").append(tr));
+          $.each(submissions, function(name, files) {
+            var tr = $("<tr>");
+            tr.append($("<td>").addClass("student").text(name));
+            $.each(names, function(_, k) {
+              if (k in files) {
+                var td = $("<td>").addClass("file");
+                td.on("click", function() {
+                  // EVENT
+                  files[k].getContents().then(function(contents) {
+                    return runner.runString(contents, "");
+                  }).then(function(result) {
+                    console.log(result);
+                  });
+                });
+                tr.append(td.text("Run"));
+              }
+              else {
+                tr.append($("<td>").addClass("missing").text("Missing"));
+              }
+            });
+            table.append(tr);
+          });
+        }
+
+        var submissionsID = "0B-_f7M_B5NMiQjFLeEo1SVBBUE0";
+        var names = ["list-drill-code.arr", "list-drill-tests.arr"].sort();
+
+        gatherSubmissions(submissionsID).then(function(submissions) {
+          var submissions = filterSubmissions(submissions, names);
+          renderSubmissions(submissions);
+          console.log(submissions);
+        }).fail(function(f) { console.log(f); });
       });
   /*
     var resultP = Q.all([runnerP, storageAPIP]).spread(
