@@ -83,7 +83,64 @@ $(function() {
           }, {});
         }
 
+        function runFile(caller, contentsP) {
+          if (!caller.hasClass("run")) {
+            alert("Please wait for the first file to finish running.");
+            return;
+          }
+
+          $(".run").addClass("run-disabled").removeClass("run");
+
+          contentsP.then(function(contents) {
+            return runner.runString(contents, "");
+          }).then(function(result) {
+            console.log(result);
+            $(".run-disabled").addClass("run").removeClass("run-disabled");
+          });
+        }
+
         function renderSubmissions(submissions) {
+          $("#students-loading").hide();
+          var table = $("#students");
+          table.append(
+              "<thead><tr><th>Student</th><th>Files</th>" +
+              "<th>Result</th></tr></thead>");
+          $.each(Object.keys(submissions).sort(), function(_, name) {
+            var div = $("<div>").addClass("pure-menu");
+            var ul = $("<ul>").addClass("pure-menu-list");
+            var li = $("<li>").addClass("pure-menu-item pure-menu-allow-hover" +
+              " pure-menu-has-children");
+            var a = $("<a>").attr("href", "#").attr("id", "menuLink1").addClass(
+              "pure-menu-link").text("Run");
+            li.append(a);
+            var list = $("<ul>").addClass("pure-menu-children");
+            var files = submissions[name];
+            $.each(names, function(_, k) {
+              var fli = $("<li>").addClass("pure-menu-item");
+              var flink = $("<a>")
+                .attr("href", "#")
+                .addClass("pure-menu-link run")
+                .text(k);
+              if (k in files) {
+                flink.on("click", function() {
+                  runFile($(this), files[k].getContents());
+                });
+                fli.append(flink);
+              }
+              else {
+                fli.addClass("pure-menu-disabled");
+                fli.append($("<div>").css("white-space", "nowrap").text(k));
+              }
+              list.append(fli);
+            });
+            table.append($("<tr>")
+              .append($("<td>").text(name))
+              .append(
+                $("<td>").append(div.append(ul.append(li.append(list)))))
+              .append(
+                $("<td>")));
+          });
+          /*
           $("#students-loading").hide();
           var table = $("#students");
           var tr = $("<tr>");
@@ -92,19 +149,15 @@ $(function() {
             tr.append($("<th>").text(name));
           });
           table.append($("<thead>").append(tr));
-          $.each(submissions, function(name, files) {
+          $.each(Object.keys(submissions).sort(), function(_, name) {
+            var files = submissions[name];
             var tr = $("<tr>");
             tr.append($("<td>").addClass("student").text(name));
             $.each(names, function(_, k) {
               if (k in files) {
-                var td = $("<td>").addClass("file");
+                var td = $("<td>").addClass("file-run");
                 td.on("click", function() {
-                  // EVENT
-                  files[k].getContents().then(function(contents) {
-                    return runner.runString(contents, "");
-                  }).then(function(result) {
-                    console.log(result);
-                  });
+                  runFile($(this), files[k].getContents());
                 });
                 tr.append(td.text("Run"));
               }
@@ -114,6 +167,7 @@ $(function() {
             });
             table.append(tr);
           });
+          */
         }
 
         var submissionsID = "0B-_f7M_B5NMiQjFLeEo1SVBBUE0";
@@ -122,38 +176,7 @@ $(function() {
         gatherSubmissions(submissionsID).then(function(submissions) {
           var submissions = filterSubmissions(submissions, names);
           renderSubmissions(submissions);
-          console.log(submissions);
         }).fail(function(f) { console.log(f); });
       });
-  /*
-    var resultP = Q.all([runnerP, storageAPIP]).spread(
-      function(runner, storageAPI) {
-        return storageAPI.api.getAllFiles(false).then(function(dirs) {
-          return dirs.map(function(d) {
-            return storageAPI.api.getAllFilesById(d.id, true).then(function(files) {
-              var found = files.filter(function(f) {
-                return f.getName() == codeName
-              });
-              if (found && found.length > 0) {
-                return found[0].getContents().then(function(contents) {
-                  return runner.runString(contents, "test");
-                });
-              }
-              else {
-                throw new Error("File not found.");
-              }
-            });
-          });
-        });
-      });
-    resultP.then(function(result) {
-      for (i = 0; i < result.length; i++) {
-        result[i].then(function(r) {
-          console.log(r); 
-        });
-      }
-    });
-    resultP.fail(function(exn) { console.log(exn); });
-    */
   });
 });
