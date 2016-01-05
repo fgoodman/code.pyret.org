@@ -83,100 +83,113 @@ $(function() {
           }, {});
         }
 
-        function runFile(caller, contentsP) {
-          if (!caller.hasClass("run")) {
-            alert("Please wait for the first file to finish running.");
-            return;
-          }
 
-          $(".run").addClass("run-disabled").removeClass("run");
+        function runAll(submissions, names, name) {
+          renderSubmissions(submissions, names, false);
 
-          contentsP.then(function(contents) {
-            return runner.runString(contents, "");
-          }).then(function(result) {
-            console.log(result);
-            $(".run-disabled").addClass("run").removeClass("run-disabled");
+          $.each(submissions, function(name, files) {
+            console.log(name, files);
+            files[name].file;
           });
+
+          renderSubmissions(submissions, names, true);
         }
 
-        function renderSubmissions(submissions) {
-          $("#students-loading").hide();
-          var table = $("#students");
-          table.append(
-              "<thead><tr><th>Student</th><th>Files</th>" +
-              "<th>Result</th></tr></thead>");
-          $.each(Object.keys(submissions).sort(), function(_, name) {
-            var div = $("<div>").addClass("pure-menu");
-            var ul = $("<ul>").addClass("pure-menu-list");
-            var li = $("<li>").addClass("pure-menu-item pure-menu-allow-hover" +
-              " pure-menu-has-children");
-            var a = $("<a>").attr("href", "#").attr("id", "menuLink1").addClass(
-              "pure-menu-link").text("Run");
-            li.append(a);
-            var list = $("<ul>").addClass("pure-menu-children");
-            var files = submissions[name];
-            $.each(names, function(_, k) {
-              var fli = $("<li>").addClass("pure-menu-item");
-              var flink = $("<a>")
-                .attr("href", "#")
-                .addClass("pure-menu-link run")
-                .text(k);
-              if (k in files) {
-                flink.on("click", function() {
-                  runFile($(this), files[k].getContents());
-                });
-                fli.append(flink);
-              }
-              else {
-                fli.addClass("pure-menu-disabled");
-                fli.append($("<div>").css("white-space", "nowrap").text(k));
-              }
-              list.append(fli);
-            });
-            table.append($("<tr>")
-              .append($("<td>").text(name))
-              .append(
-                $("<td>").append(div.append(ul.append(li.append(list)))))
-              .append(
-                $("<td>")));
-          });
-          /*
-          $("#students-loading").hide();
-          var table = $("#students");
-          var tr = $("<tr>");
-          tr.append($("<th>").text("Student"));
+        function generateRunHtml(submissions, student, files, names, enabled) {
+          var t = $("<td><div class=\"pure-menu\"><ul class=\"" +
+              "pure-menu-list\"><li class=\"pure-menu-item " +
+              "pure-menu-allow-hover pure-menu-has-children\">" +
+              "</li></ul></div></td>");
+          if (!enabled) {
+            t.find("li").first()
+              .addClass("pure-menu-disabled").text("Run");
+            return t;
+          }
+          t.find("li").first().html(
+                 "<a href=\"#\" " +
+                 "class=\"pure-menu-link\">Run</a><ul class=\"" +
+                 "pure-menu-children\"></ul></li></ul></div></td>");
+          var st = t.find(".pure-menu-children").first();
           $.each(names, function(_, name) {
-            tr.append($("<th>").text(name));
+            var ss = $("<li class=\"pure-menu-item\"></li>");
+            if (name in files) {
+              ss.append($("<a class=\"pure-menu-link\" href=\"#\">").text(name)
+                .on("click", function() {
+                  renderSubmissions(submissions, names, false);
+                  files[name].file.getContents().then(function(contents) {
+                    return runner.runString(contents, "");
+                  }).then(function(result) {
+                    submissions[student][name].result = result;
+                    return renderSubmissions(submissions, names, true);
+                  });
+                }));
+            }
+            else {
+              ss.addClass("pure-menu-disabled")
+              ss.append($("<div>").css("white-space", "nowrap").text(name));
+            }
+            st.append(ss);
           });
-          table.append($("<thead>").append(tr));
+
+          return t;
+        }
+
+        function generateResultHtml(files) {
+          var t = $("<td>");
+
+          $.each(Object.keys(files).sort(), function(_, name) {
+            if (files[name].result !== null) {
+              console.log(name, files[name].result);
+              t.append("<em>" + name + ":</em> " + files[name].result);
+            }
+          });
+
+          return t;
+        }
+
+        function generateSubmissionHtml(submissions, name, names, enabled) {
+          var t = $("<tr>");
+          t.append("<td>" + name + "</td>");
+
+          t.append(generateRunHtml(
+                submissions, name, submissions[name], names, enabled));
+          t.append(generateResultHtml(submissions[name]));
+
+          return t;
+        }
+
+        function renderSubmissions(submissions, names, enabled) {
+          $("#students-loading").hide();
+          var t = $("#students");
+          t.html("");
+
+          t.append(
+              "<thead><tr><th>Student</th><th>Files</th>" +
+              "<th>Results</th></tr></thead>");
+
           $.each(Object.keys(submissions).sort(), function(_, name) {
-            var files = submissions[name];
-            var tr = $("<tr>");
-            tr.append($("<td>").addClass("student").text(name));
-            $.each(names, function(_, k) {
-              if (k in files) {
-                var td = $("<td>").addClass("file-run");
-                td.on("click", function() {
-                  runFile($(this), files[k].getContents());
-                });
-                tr.append(td.text("Run"));
-              }
-              else {
-                tr.append($("<td>").addClass("missing").text("Missing"));
-              }
-            });
-            table.append(tr);
+            t.append(generateSubmissionHtml(
+                submissions, name, names, enabled));
           });
-          */
         }
 
         var submissionsID = "0B-_f7M_B5NMiQjFLeEo1SVBBUE0";
         var names = ["list-drill-code.arr", "list-drill-tests.arr"].sort();
 
+        for (var i = 0; i < 50; i++) {
+        gQ(gapi.client.drive.files.list({
+          q: "title = 'list-drill-code.arr' and trashed = false"
+        })).then(function(x) {
+          console.log(x);
+        });
+        }
+
+        /*
         gatherSubmissions(submissionsID).then(function(submissions) {
           var submissions = filterSubmissions(submissions, names);
-          renderSubmissions(submissions);
+          renderSubmissions(submissions, names, true);
         }).fail(function(f) { console.log(f); });
+        */
       });
   });
 });
