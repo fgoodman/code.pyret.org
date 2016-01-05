@@ -20,12 +20,9 @@ $(function() {
         var drive = storageAPI.drive;
         var fileBuilder = storageAPI.fileBuilder;
 
-        /*
-         * batchGet : [String] -> P([{File, Status}])
-         * Consumes an array of gDrive IDs and produces a promise to an array
-         * of objects containing files and status codes.
-         */
-        function batchGet(ids) {
+        function batchRequest(ids, action, build) {
+          action = action || "";
+
           function xhrToData(xhr) {
             var lines = xhr.split("\r\n");
             var boundary = lines[0];
@@ -34,16 +31,15 @@ $(function() {
             $.each(lines, function(i, l) {
               if (l.length) {
                 if (l.indexOf(boundary) == 0) {
-                  if (d) data.push(fileBuilder(d));
+                  if (d && build === true) data.push(fileBuilder(d));
+                  else if (d) data.push(d);
                   d = {};
                 }
                 else if (d) {
                   try {
                     d = JSON.parse(l);
                   }
-                  catch(e) {
-
-                  }
+                  catch(e) {}
                 }
               }
             });
@@ -58,10 +54,10 @@ $(function() {
             for (var i = 0; i < ids.length; i++) {
               body.push("--" + boundary);
               body.push("Content-Type: application/http");
-              body.push("Content-ID: <item" + i + ":user@example.com>");
+              body.push("Content-ID: <item" + i + ":Eckveldt@gmail.com>");
               body.push("Content-Transfer-Encoding: binary");
               body.push(""); body.push("");
-              body.push("GET /drive/v2/files/" + ids[i]);
+              body.push("GET /drive/v2/files/" + ids[i] + "/" + action);
               body.push(""); body.push("");
             }
 
@@ -79,22 +75,21 @@ $(function() {
             },
             data: idsToData(ids)
           })).then(function(xhr) {
-            console.log(xhrToData(xhr));
             return xhrToData(xhr);
           });
         }
 
-        /*
-         * getFiles : String -> P([File])
-         * Consumes a gDrive ID and produces a promise to an array of files.
-         */
-        function getFiles(id) {
-          return gQ(drive.children.list({folderId: id}))
-            .then(function(directory) {
-              return Q.all(batchGet(directory.items.map(function(file) {
-                return file.id;
-              })));
-            });
+        function getPointersFromDirs(ids) {
+        }
+
+        function getFiles(ids) {
+
+        }
+
+        function gatherSubmissionsBatch(id) {
+          var deferred = Q.defer();
+          var submissions = {};
+
         }
 
         /*
@@ -235,15 +230,49 @@ $(function() {
           });
         }
 
-
         var submissionsID = "0B-_f7M_B5NMiQjFLeEo1SVBBUE0";
         var names = ["list-drill-code.arr", "list-drill-tests.arr"].sort();
 
-        gatherSubmissions(submissionsID).then(function(submissions) {
+        batchRequest([submissionsID], "children").then(function(dirs) {
+          var studentIDs = dirs[0].items.map(function(dir) {
+            return dir.id;
+          });
+          return batchRequest(studentIDs);
+        }).then(function(students) {
+          var folderIDs = students.map(function(student) {
+            return student.id;
+          });
+          var names = students.map(function(student) {
+            return student.title;
+          });
+          return batchRequest(folderIDs, "children").then(function(folders) {
+            var files = [];
+            for (var i = 0; i < folders.length; i++) {
+              if (folders[i].items !== undefined) {
+                files = files.concat(folders[i].items.map(function(file) {
+                  return file.id;
+                }));
+              }
+            }
+            return batchRequest(files).then(function(submissions) {
+              submissions = submissions.filter(function(submission) {
+                return submission.title === "submission";
+              });
+              return batchRequest(submissions.map(function(submission) {
+                return submission.id;
+              }), "children");
+            }).then(function(files) {
+              console.log(files);
+            });
+          });
+        }).fail(function(f) { console.log(f); });
+/*
+        gatherSubmissionsBatch(submissionsID).then(function(submissions) {
           var submissions = filterSubmissions(submissions, names);
           renderSubmissions(submissions, names, true);
           runAll(submissions, names, names[0]);
         }).fail(function(f) { console.log(f); });
+        */
       });
   });
 });
