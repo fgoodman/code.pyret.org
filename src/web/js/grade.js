@@ -21,14 +21,131 @@ $(function() {
         var fileBuilder = storageAPI.fileBuilder;
 
         /*
+        var req = function() {
+          var throttle = false;
+          var delay = 1.0;
+          return function(thunk) {
+            while (true) {
+              var resultP = gQ(thunk()).then(function(result) {
+                console.log(result);
+                if (result.code === undefined) {
+                  return result;
+                }
+                else {
+                  return null;
+                }
+              });
+              
+              if (resultP !== null) {
+                return resultP;
+              }
+              else {
+                if (delay > 16) return null;
+                var init = new Date().getTime();
+                var wait = delay * 1000 + Math.floor(Math.random() * 1000);
+                console.error("Waiting " + wait + "ms before retry...");
+                while (init + wait > new Date().getTime()) {}
+                delay = delay * 2;
+              }
+            }
+          };
+        }();
+        
+        function req(thunk) {
+          var delay = 1.0;
+          var repeat = false;
+          do {
+            var res = gQ(thunk()).then(function(result) {
+              repeat = false;
+              return result;
+            }).fail(function(error) {
+              if (error.err.code === 403) {
+                var start = new Date().getTime();
+                var wait = Math.floor((delay + Math.random()) * 1000);
+                while (start + wait > new Date().getTime()) {};
+                repeat = true;
+                delay = delay * 2;
+                return error;
+              }
+              else {
+                repeat = false;
+                return error;
+              }
+            });
+          } while (repeat && delay < 16);
+
+          return res;
+        }
+
+        function req(thunk, wait) {
+          var start = new Date().getTime();
+          while (start + wait > new Date().getTime()) {}
+          return thunk().then(function(res) {
+            console.log(res);
+            return res;
+          }).fail(function(err) {
+            return req(thunk, wait + 1000 + Math.floor(1000 * Math.random()));
+          });
+        }
+
+        var throttle = false;
+        var wait = 0;
+        function req(thunk) {
+          console.log(wait);
+          return thunk().then(function(res) {
+            if (wait > 0) wait -= 100;
+            else throttle = false;
+            return res;
+          }).fail(function(err) {
+            if (wait == 0) wait = 900;
+            wait += 100;
+            throttle = true;
+            var start = new Date().getTime();
+            while (start + wait > new Date().getTime()) {}
+            return req(thunk);
+          });
+        }
+      */
+
+        var nextWait = 0;
+        function req(thunk) {
+          var deferred = Q.defer();
+
+          function req_(thunk) {
+            thunk().then(function(res) {
+              if (nextWait > 0) nextWait -= 100;
+              console.log("Resolving with", res);
+              deferred.resolve(res);
+            }).fail(function(err) {
+              if (nextWait == 0) nextWait = 900;
+              nextWait += 100;
+              //console.log("Waiting for " + nextWait + "ms...");
+              setTimeout(function () {
+                req_(thunk);
+              }, nextWait);
+            });
+          }
+          req_(thunk);
+
+          return deferred.promise;
+        }
+
+        /*
          * getFiles : String -> P([File])
          * Consumes a gDrive ID and produces a promise to an array of files.
          */
         function getFiles(id) {
-          return gQ(drive.children.list({folderId: id}))
+          var childrenThunk = function() {
+            return gQ(drive.children.list({folderId: id}));
+          };
+          return req(childrenThunk)
             .then(function(directory) {
+              console.log(id, directory);
               return Q.all(directory.items.map(function(file) {
-                return gQ(drive.files.get({fileId: file.id}))
+                var filesThunk = function() {
+                  return gQ(drive.files.get({fileId: file.id}));
+                };
+                return req(filesThunk)
                   .then(fileBuilder);
                 }));
               });
@@ -45,6 +162,7 @@ $(function() {
 
           getFiles(id).then(function(students) {
             return Q.all(students.map(function(student) {
+              console.log(student, student.getUniqueId());
               var name = student.getName();
               return getFiles(student.getUniqueId()).then(function(dirs) {
                 return dirs.find(function(dir) {
@@ -55,11 +173,14 @@ $(function() {
                  * TODO(fgoodman): Remove gremlin files with preprocessing
                  * and remove this conditional (and below as well).
                  */
-                if (dir !== undefined)
+                if (dir !== undefined) {
                   return getFiles(dir.getUniqueId());
-                else
+                }
+                else {
                   return null;
+                }
               }).then(function(files) {
+                console.log(name, files);
                 if (files)
                   submissions[name] = files;
                 return files;
@@ -116,7 +237,8 @@ $(function() {
               ss.append($("<a class=\"pure-menu-link\" href=\"#\">").text(name)
                 .on("click", function() {
                   renderSubmissions(submissions, names, false);
-                  files[name].file.getContents().then(function(contents) {
+                  console.log(files[name]);
+                  files[name].getContents().then(function(contents) {
                     return runner.runString(contents, "");
                   }).then(function(result) {
                     submissions[student][name].result = result;
@@ -176,20 +298,11 @@ $(function() {
         var submissionsID = "0B-_f7M_B5NMiQjFLeEo1SVBBUE0";
         var names = ["list-drill-code.arr", "list-drill-tests.arr"].sort();
 
-        for (var i = 0; i < 50; i++) {
-        gQ(gapi.client.drive.files.list({
-          q: "title = 'list-drill-code.arr' and trashed = false"
-        })).then(function(x) {
-          console.log(x);
-        });
-        }
-
-        /*
         gatherSubmissions(submissionsID).then(function(submissions) {
+          console.log(submissions);
           var submissions = filterSubmissions(submissions, names);
           renderSubmissions(submissions, names, true);
         }).fail(function(f) { console.log(f); });
-        */
       });
   });
 });
