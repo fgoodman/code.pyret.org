@@ -11,7 +11,7 @@ $(function() {
     var proxy = function(s) {
       return APP_BASE_URL + "/downloadImg?" + s;
     };
-    var makeFind = find.createFindModule(null);
+    var makeFind = find.createFindModule(storageAPIP);
     var runnerP = webRunner.createRunner(proxy, makeFind);
 
     var resultP = Q.all([runnerP, storageAPIP]).spread(
@@ -21,92 +21,11 @@ $(function() {
         var fileBuilder = storageAPI.fileBuilder;
 
         /*
-        var req = function() {
-          var throttle = false;
-          var delay = 1.0;
-          return function(thunk) {
-            while (true) {
-              var resultP = gQ(thunk()).then(function(result) {
-                console.log(result);
-                if (result.code === undefined) {
-                  return result;
-                }
-                else {
-                  return null;
-                }
-              });
-              
-              if (resultP !== null) {
-                return resultP;
-              }
-              else {
-                if (delay > 16) return null;
-                var init = new Date().getTime();
-                var wait = delay * 1000 + Math.floor(Math.random() * 1000);
-                console.error("Waiting " + wait + "ms before retry...");
-                while (init + wait > new Date().getTime()) {}
-                delay = delay * 2;
-              }
-            }
-          };
-        }();
-        
-        function req(thunk) {
-          var delay = 1.0;
-          var repeat = false;
-          do {
-            var res = gQ(thunk()).then(function(result) {
-              repeat = false;
-              return result;
-            }).fail(function(error) {
-              if (error.err.code === 403) {
-                var start = new Date().getTime();
-                var wait = Math.floor((delay + Math.random()) * 1000);
-                while (start + wait > new Date().getTime()) {};
-                repeat = true;
-                delay = delay * 2;
-                return error;
-              }
-              else {
-                repeat = false;
-                return error;
-              }
-            });
-          } while (repeat && delay < 16);
-
-          return res;
-        }
-
-        function req(thunk, wait) {
-          var start = new Date().getTime();
-          while (start + wait > new Date().getTime()) {}
-          return thunk().then(function(res) {
-            console.log(res);
-            return res;
-          }).fail(function(err) {
-            return req(thunk, wait + 1000 + Math.floor(1000 * Math.random()));
-          });
-        }
-
-        var throttle = false;
-        var wait = 0;
-        function req(thunk) {
-          console.log(wait);
-          return thunk().then(function(res) {
-            if (wait > 0) wait -= 100;
-            else throttle = false;
-            return res;
-          }).fail(function(err) {
-            if (wait == 0) wait = 900;
-            wait += 100;
-            throttle = true;
-            var start = new Date().getTime();
-            while (start + wait > new Date().getTime()) {}
-            return req(thunk);
-          });
-        }
-      */
-
+         * req : Thunk(P) -> P
+         * Consumes a thunk returning a promise to a Drive API result and
+         * returns a promise to the result of the API call. Note the API call
+         * must be valid.
+         */
         var nextWait = 0;
         function req(thunk) {
           var deferred = Q.defer();
@@ -114,12 +33,10 @@ $(function() {
           function req_(thunk) {
             thunk().then(function(res) {
               if (nextWait > 0) nextWait -= 100;
-              console.log("Resolving with", res);
               deferred.resolve(res);
             }).fail(function(err) {
               if (nextWait == 0) nextWait = 900;
               nextWait += 100;
-              //console.log("Waiting for " + nextWait + "ms...");
               setTimeout(function () {
                 req_(thunk);
               }, nextWait);
@@ -140,7 +57,6 @@ $(function() {
           };
           return req(childrenThunk)
             .then(function(directory) {
-              console.log(id, directory);
               return Q.all(directory.items.map(function(file) {
                 var filesThunk = function() {
                   return gQ(drive.files.get({fileId: file.id}));
@@ -162,7 +78,6 @@ $(function() {
 
           getFiles(id).then(function(students) {
             return Q.all(students.map(function(student) {
-              console.log(student, student.getUniqueId());
               var name = student.getName();
               return getFiles(student.getUniqueId()).then(function(dirs) {
                 return dirs.find(function(dir) {
@@ -180,7 +95,6 @@ $(function() {
                   return null;
                 }
               }).then(function(files) {
-                console.log(name, files);
                 if (files)
                   submissions[name] = files;
                 return files;
@@ -205,12 +119,12 @@ $(function() {
         }
 
 
+        // Not yet used.
         function runAll(submissions, names, name) {
           renderSubmissions(submissions, names, false);
 
           $.each(submissions, function(name, files) {
             console.log(name, files);
-            files[name].file;
           });
 
           renderSubmissions(submissions, names, true);
@@ -237,7 +151,6 @@ $(function() {
               ss.append($("<a class=\"pure-menu-link\" href=\"#\">").text(name)
                 .on("click", function() {
                   renderSubmissions(submissions, names, false);
-                  console.log(files[name]);
                   files[name].getContents().then(function(contents) {
                     return runner.runString(contents, "");
                   }).then(function(result) {
@@ -261,7 +174,8 @@ $(function() {
 
           $.each(Object.keys(files).sort(), function(_, name) {
             if (files[name].result !== null) {
-              console.log(name, files[name].result);
+              if (files[name].result !== undefined)
+                console.log(name, files[name].result);
               t.append("<em>" + name + ":</em> " + files[name].result);
             }
           });
@@ -299,7 +213,6 @@ $(function() {
         var names = ["list-drill-code.arr", "list-drill-tests.arr"].sort();
 
         gatherSubmissions(submissionsID).then(function(submissions) {
-          console.log(submissions);
           var submissions = filterSubmissions(submissions, names);
           renderSubmissions(submissions, names, true);
         }).fail(function(f) { console.log(f); });
