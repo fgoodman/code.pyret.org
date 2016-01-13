@@ -4,6 +4,33 @@ $(function() {
   "/js/editor-find-module.js"], function(_, webRunner,
   find) {
 
+    var config = {
+      assignment: "0B-_f7M_B5NMiQjFLeEo1SVBBUE0",
+      files: [
+        "list-drill-code.arr",
+        "list-drill-tests.arr"
+      ],
+      targets: [
+        {
+          name: "list-drill-code.arr",
+          file: "list-drill-code.arr",
+          subs: {}
+        },
+        {
+          name: "list-drill-tests.arr",
+          file: "list-drill-tests.arr",
+          subs: {}
+        },
+        {
+          name: "gold",
+          file: "list-drill-tests.arr",
+          subs: {
+            "list-drill-code.arr": "0B-_f7M_B5NMiZ1dJclRWMGN3ZTg"
+          }
+        }
+      ]
+    };
+
     // TODO(all): Move createPCAPI to a require module.
     var storageAPIP = createProgramCollectionAPI(
       clientId, apiKey, "code.pyret.org", false);
@@ -12,7 +39,7 @@ $(function() {
       return APP_BASE_URL + "/downloadImg?" + s;
     };
     var makeFind = find.createFindModule(storageAPIP);
-    var runnerP = webRunner.createRunner(proxy, makeFind);
+    var runnerP = webRunner.createRunner(proxy, makeFind, config);
 
     var resultP = Q.all([runnerP, storageAPIP]).spread(
       function(runner, storageAPI) {
@@ -118,19 +145,58 @@ $(function() {
           }, {});
         }
 
-
-        // Not yet used.
-        function runAll(submissions, names, name) {
-          renderSubmissions(submissions, names, false);
-
-          $.each(submissions, function(name, files) {
-            console.log(name, files);
-          });
-
-          renderSubmissions(submissions, names, true);
+        function convertSubmissions(submissions, targets) {
+          return Object.keys(submissions).reduce(function(o, i) {
+            o[i] = {};
+            for (var j = 0; j < targets.length; j++) {
+              var target = targets[j];
+              o[i][target.name] = submissions[i][target.file];
+              if (o[i][target.name] !== undefined)
+                o[i][target.name].subs = target.subs;
+            }
+            return o;
+          }, {});
         }
 
-        function generateRunHtml(submissions, student, files, names, enabled) {
+
+        // Not yet used.
+        function runAll(submissions, targets, name) {
+          renderSubmissions(submissions, targets, false);
+
+          $.each(submissions, function(name, targets) {
+            console.log(name, targets);
+          });
+
+          renderSubmissions(submissions, targets, true);
+        }
+
+        function generateRunItemHtml(
+            target, student, submissions, targets) {
+          var item = $("<li class=\"pure-menu-item\"></li>");
+          if (submissions[student][target.name] !== undefined) {
+            item.append($("<a class=\"pure-menu-link\" href=\"#\">").text(target.name)
+              .on("click", function() {
+                renderSubmissions(submissions, targets, false);
+                submissions[student][target.name].getContents().then(function(contents) {
+                  return runner.runString(contents, "");
+                }).then(function(result) {
+                  submissions[student][target.name].result = result;
+                  return renderSubmissions(submissions, targets, true);
+                });
+              }));
+          }
+          else {
+            item
+              .addClass("pure-menu-disabled")
+              .append($("<div>")
+              .css("white-space", "nowrap")
+              .text(name));
+          }
+
+          return item;
+        }
+
+        function generateRunHtml(submissions, student, targets, enabled) {
           var t = $("<td><div class=\"pure-menu\"><ul class=\"" +
               "pure-menu-list\"><li class=\"pure-menu-item " +
               "pure-menu-allow-hover pure-menu-has-children\">" +
@@ -145,56 +211,40 @@ $(function() {
                  "class=\"pure-menu-link\">Run</a><ul class=\"" +
                  "pure-menu-children\"></ul></li></ul></div></td>");
           var st = t.find(".pure-menu-children").first();
-          $.each(names, function(_, name) {
-            var ss = $("<li class=\"pure-menu-item\"></li>");
-            if (name in files) {
-              ss.append($("<a class=\"pure-menu-link\" href=\"#\">").text(name)
-                .on("click", function() {
-                  renderSubmissions(submissions, names, false);
-                  files[name].getContents().then(function(contents) {
-                    return runner.runString(contents, "");
-                  }).then(function(result) {
-                    submissions[student][name].result = result;
-                    return renderSubmissions(submissions, names, true);
-                  });
-                }));
-            }
-            else {
-              ss.addClass("pure-menu-disabled")
-              ss.append($("<div>").css("white-space", "nowrap").text(name));
-            }
-            st.append(ss);
+          $.each(targets, function(_, target) {
+            st.append(
+              generateRunItemHtml(target, student, submissions, targets));
           });
 
           return t;
         }
 
-        function generateResultHtml(files) {
+        function generateResultHtml(targets) {
           var t = $("<td>");
 
-          $.each(Object.keys(files).sort(), function(_, name) {
-            if (files[name].result !== null) {
-              if (files[name].result !== undefined)
-                console.log(name, files[name].result);
-              t.append("<em>" + name + ":</em> " + files[name].result);
+          $.each(Object.keys(targets).sort(), function(_, name) {
+            if (targets[name] !== undefined && targets[name].result !== null) {
+              if (targets[name].result !== undefined)
+                console.log(name, targets[name].result);
+              t.append("<em>" + name + ":</em> " + targets[name].result);
             }
           });
 
           return t;
         }
 
-        function generateSubmissionHtml(submissions, name, names, enabled) {
+        function generateSubmissionHtml(submissions, name, targets, enabled) {
           var t = $("<tr>");
           t.append("<td>" + name + "</td>");
 
           t.append(generateRunHtml(
-                submissions, name, submissions[name], names, enabled));
+                submissions, name, targets, enabled));
           t.append(generateResultHtml(submissions[name]));
 
           return t;
         }
 
-        function renderSubmissions(submissions, names, enabled) {
+        function renderSubmissions(submissions, targets, enabled) {
           $("#students-loading").hide();
           var t = $("#students");
           t.html("");
@@ -205,16 +255,15 @@ $(function() {
 
           $.each(Object.keys(submissions).sort(), function(_, name) {
             t.append(generateSubmissionHtml(
-                submissions, name, names, enabled));
+                submissions, name, targets, enabled));
           });
         }
 
-        var submissionsID = "0B-_f7M_B5NMiQjFLeEo1SVBBUE0";
-        var names = ["list-drill-code.arr", "list-drill-tests.arr"].sort();
-
-        gatherSubmissions(submissionsID).then(function(submissions) {
-          var submissions = filterSubmissions(submissions, names);
-          renderSubmissions(submissions, names, true);
+        var files = config.files.sort();
+        gatherSubmissions(config.assignment).then(function(submissions) {
+          var submissions = filterSubmissions(submissions, files);
+          submissions = convertSubmissions(submissions, config.targets);
+          renderSubmissions(submissions, config.targets, true);
         }).fail(function(f) { console.log(f); });
       });
   });
