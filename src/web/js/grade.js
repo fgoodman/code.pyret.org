@@ -28,7 +28,12 @@ $(function() {
             "list-drill-code.arr": "0B-_f7M_B5NMiZ1dJclRWMGN3ZTg"
           }
         }
-      ]
+      ],
+      testTarget: {
+        name: "test-suite",
+        target: "list-drill-code.arr",
+        id: "0B-_f7M_B5NMiZ1dJclRWMGN3ZTg"
+      }
     };
 
     // TODO(all): Move createPCAPI to a require module.
@@ -134,6 +139,29 @@ $(function() {
           return deferred.promise;
         }
 
+        function addTestSuite(submissions, target) {
+          return req(function() {
+            return gQ(drive.files.get({fileId: target.id}));
+          })
+            .then(fileBuilder)
+            .then(function(file) {
+              var keys = Object.keys(submissions);
+              for (var i = 0; i < keys.length; i++) {
+                var s = submissions[keys[i]];
+                if (s[target.target].getUniqueId !== undefined) {
+                  s["test-suite"] = $.extend({}, file);
+                  s["test-suite"].subs = {};
+                  s["test-suite"].subs[target.target] = s[target.target].getUniqueId();
+                }
+                else {
+                  s["test-suite"] = undefined;
+                }
+
+              }
+              return submissions;
+            }).fail(function(f) { console.log(f); });
+        }
+
         function filterSubmissions(submissions, names) {
           return Object.keys(submissions).reduce(function(o, i) {
             o[i] = submissions[i].reduce(function(base, file) {
@@ -150,9 +178,9 @@ $(function() {
             o[i] = {};
             for (var j = 0; j < targets.length; j++) {
               var target = targets[j];
+              o[i][target.name] = {};
               o[i][target.name] = $.extend({}, submissions[i][target.file]);
-              if (o[i][target.name] !== undefined)
-                o[i][target.name].subs = target.subs;
+              o[i][target.name].subs = target.subs;
             }
             return o;
           }, {});
@@ -171,18 +199,19 @@ $(function() {
         }
 
         function generateRunItemHtml(
-            target, student, submissions, targets) {
+            name, student, submissions, targets) {
           var item = $("<li class=\"pure-menu-item\"></li>");
-          if (submissions[student][target.name] !== undefined) {
+          if (submissions[student][name] !== undefined) {
             item.append(
-                $("<a class=\"pure-menu-link\" href=\"#\">").text(target.name)
+                $("<a class=\"pure-menu-link\" href=\"#\">").text(name)
               .on("click", function() {
                 renderSubmissions(submissions, targets, false);
-                submissions[student][target.name].getContents().then(
+                submissions[student][name].getContents().then(
                   function(contents) {
-                  return runner.runString(contents, "", target.subs);
+                  return runner.runString(
+                    contents, "", submissions[student][name].subs);
                   }).then(function(result) {
-                    submissions[student][target.name].result = result;
+                    submissions[student][name].result = result;
                     return renderSubmissions(submissions, targets, true);
                   });
               }));
@@ -213,24 +242,31 @@ $(function() {
                  "class=\"pure-menu-link\">Run</a><ul class=\"" +
                  "pure-menu-children\"></ul></li></ul></div></td>");
           var st = t.find(".pure-menu-children").first();
-          $.each(targets, function(_, target) {
+          for (var i = 0; i < targets.length; i++) {
+            var name = targets[i];
             st.append(
-              generateRunItemHtml(target, student, submissions, targets));
-          });
+              generateRunItemHtml(name, student, submissions, targets));
+          }
 
           return t;
         }
 
-        function generateResultHtml(targets) {
+        function generateResultHtml(submission, targets) {
           var t = $("<td>");
 
-          $.each(Object.keys(targets).sort(), function(_, name) {
-            if (targets[name] !== undefined && targets[name].result !== null) {
-              if (targets[name].result !== undefined)
-                console.log(name, targets[name].result);
-              t.append("<em>" + name + ":</em> " + targets[name].result);
+          for (var i = 0; i < targets.length; i++) {
+            var name = targets[i];
+            if (name in submission && submission[name] !== null) {
+              if (submission[name] !== undefined) {
+                t.append("<em>" + name + ":</em> " + submission[name].result);
+                if (submission[name].result !== undefined)
+                  console.log(name, submission[name].result);
+              }
+              else {
+                t.append("<em>" + name + ":</em> undefined");
+              }
             }
-          });
+          }
 
           return t;
         }
@@ -241,7 +277,7 @@ $(function() {
 
           t.append(generateRunHtml(
                 submissions, name, targets, enabled));
-          t.append(generateResultHtml(submissions[name]));
+          t.append(generateResultHtml(submissions[name], targets));
 
           return t;
         }
@@ -262,10 +298,23 @@ $(function() {
         }
 
         var files = config.files.sort();
+        var targets = config.targets.map(function(target) {
+          return target.name;
+        });
         gatherSubmissions(config.assignment).then(function(submissions) {
           var submissions = filterSubmissions(submissions, files);
           submissions = convertSubmissions(submissions, config.targets);
-          renderSubmissions(submissions, config.targets, true);
+          if (config.testTarget !== undefined) {
+            addTestSuite(submissions, config.testTarget).then(
+              function(submissions) {
+                targets.push("test-suite");
+                renderSubmissions(submissions, targets, true);
+              })
+            .fail(function(f) { console.log(f) });
+          }
+          else {
+            renderSubmissions(submissions, targets, true);
+          }
         }).fail(function(f) { console.log(f); });
       });
   });
