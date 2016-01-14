@@ -201,7 +201,7 @@ $(function() {
         function generateRunItemHtml(
             name, student, submissions, targets) {
           var item = $("<li class=\"pure-menu-item\"></li>");
-          if (submissions[student][name] !== undefined) {
+          if (submissions[student][name] !== undefined && submissions[student][name]._googObj !== undefined) {
             item.append(
                 $("<a class=\"pure-menu-link\" href=\"#\">").text(name)
               .on("click", function() {
