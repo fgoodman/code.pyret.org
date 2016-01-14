@@ -30,7 +30,7 @@ define(["q", "js/secure-loader", "js/runtime-util"], function(q, loader, util) {
       }
       return message;
     }
-    function makeMyGDriveLocator(filename) {
+    function makeMyGDriveLocator(filename, id) {
       function checkFileResponse(files, restarter) {
         if(files.length === 0) {
           restarter.error(runtime.ffi.makeMessageException("Could not find module with name " + filename + " in your drive."));
@@ -49,7 +49,13 @@ define(["q", "js/secure-loader", "js/runtime-util"], function(q, loader, util) {
         // We start by setting up the fetch of the file; lots of methods will
         // close over this.
         var filesP = storageAPI.then(function(storage) {
-          return storage.api.getFileByName(filename);
+          if (id !== undefined) {
+            // Used for CPO/grade import hijacking.
+            return [storage.api.getFileById(id)];
+          }
+          else {
+            return storage.api.getFileByName(filename);
+          }
         });
         filesP.fail(function(failure) {
           restarter.error(runtime.ffi.makeMessageException(fileRequestFailure(failure, filename)));

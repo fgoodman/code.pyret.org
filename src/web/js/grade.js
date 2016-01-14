@@ -39,7 +39,7 @@ $(function() {
       return APP_BASE_URL + "/downloadImg?" + s;
     };
     var makeFind = find.createFindModule(storageAPIP);
-    var runnerP = webRunner.createRunner(proxy, makeFind, config);
+    var runnerP = webRunner.createRunner(proxy, makeFind);
 
     var resultP = Q.all([runnerP, storageAPIP]).spread(
       function(runner, storageAPI) {
@@ -150,7 +150,7 @@ $(function() {
             o[i] = {};
             for (var j = 0; j < targets.length; j++) {
               var target = targets[j];
-              o[i][target.name] = submissions[i][target.file];
+              o[i][target.name] = $.extend({}, submissions[i][target.file]);
               if (o[i][target.name] !== undefined)
                 o[i][target.name].subs = target.subs;
             }
@@ -174,15 +174,17 @@ $(function() {
             target, student, submissions, targets) {
           var item = $("<li class=\"pure-menu-item\"></li>");
           if (submissions[student][target.name] !== undefined) {
-            item.append($("<a class=\"pure-menu-link\" href=\"#\">").text(target.name)
+            item.append(
+                $("<a class=\"pure-menu-link\" href=\"#\">").text(target.name)
               .on("click", function() {
                 renderSubmissions(submissions, targets, false);
-                submissions[student][target.name].getContents().then(function(contents) {
-                  return runner.runString(contents, "");
-                }).then(function(result) {
-                  submissions[student][target.name].result = result;
-                  return renderSubmissions(submissions, targets, true);
-                });
+                submissions[student][target.name].getContents().then(
+                  function(contents) {
+                  return runner.runString(contents, "", target.subs);
+                  }).then(function(result) {
+                    submissions[student][target.name].result = result;
+                    return renderSubmissions(submissions, targets, true);
+                  });
               }));
           }
           else {

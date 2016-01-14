@@ -39,25 +39,33 @@ define([
           var replEnv = gmf(compileStructs, "standard-builtins");
           var constructors = gdriveLocators.makeLocatorConstructors(storageAPI, runtime, compileLib, compileStructs);
 
-          function findModule(contextIgnored, dependency) {
-            return runtime.safeCall(function() {
-              return runtime.ffi.cases(gmf(compileStructs, "is-Dependency"), "Dependency", dependency, {
-                builtin: function(name) {
-                          return gmf(builtin, "make-builtin-locator").app(name); 
-                         },
-                dependency: function(protocol, args) {
-                  var arr = runtime.ffi.toArray(args);
-                  if (protocol === "my-gdrive") {
-                    return constructors.makeMyGDriveLocator(arr[0]);
-                  }
-                  else {
-                    console.error("Unknown import: ", dependency);
-                  }
-                } // Add other import types later!
+          function findModule(subs) {
+            return function (contextIgnored, dependency) {
+              return runtime.safeCall(function() {
+                return runtime.ffi.cases(gmf(compileStructs, "is-Dependency"), "Dependency", dependency, {
+                  builtin: function(name) {
+                            return gmf(builtin, "make-builtin-locator").app(name); 
+                           },
+                  dependency: function(protocol, args) {
+                    var arr = runtime.ffi.toArray(args);
+                    if (protocol === "my-gdrive") {
+                      if (arr[0] in subs) {
+                        return constructors.makeMyGDriveLocator(
+                          arr[0], subs[arr[0]]);
+                      }
+                      else {
+                        return constructors.makeMyGDriveLocator(arr[0]);
+                      }
+                    }
+                    else {
+                      console.error("Unknown import: ", dependency);
+                    }
+                  } // Add other import types later!
+                });
+              }, function (locator) {
+                return gmf(compileLib, "located").app(locator, runtime.nothing);
               });
-            }, function (locator) {
-              return gmf(compileLib, "located").app(locator, runtime.nothing);
-            });
+            };
           }
           findModuleP.resolve(findModule);
         });

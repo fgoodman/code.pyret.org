@@ -47,13 +47,13 @@ define([
                 runtime.makeObject({
                   "runtime": runtime.makeOpaque(runtime)
                 }));
-              function run(locator /* A Pyret Locator */) {
+              function run(locator /* A Pyret Locator */, subs) {
                 var resultP = q.defer();
                 runtime.runThunk(function() {
                   return runtime.safeTail(function() {
                     gmf(compileLib, "compile-and-run-locator").app(
                         locator,
-                        runtime.makeFunction(findModule),
+                        runtime.makeFunction(findModule(subs)),
                         runtime.nothing, // no context just yet
                         pr,
                         gmf(compileStructs, "default-compile-options")
@@ -64,8 +64,9 @@ define([
                 });
                 return resultP.promise;
               }
-              function runString(str, name) {
-                return run(gmf(compileLib, "string-locator").app(name, str));
+              function runString(str, name, subs) {
+                return run(
+                    gmf(compileLib, "string-locator").app(name, str), subs);
               }
               return { run: run, runString: runString };
             });
