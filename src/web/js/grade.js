@@ -4,37 +4,6 @@ $(function() {
   "/js/editor-find-module.js"], function(_, webRunner,
   find) {
 
-    var config = {
-      assignment: "0B-_f7M_B5NMiQjFLeEo1SVBBUE0",
-      files: [
-        "list-drill-code.arr",
-        "list-drill-tests.arr"
-      ],
-      targets: [
-        {
-          name: "list-drill-code.arr",
-          file: "list-drill-code.arr",
-          subs: {}
-        },
-        {
-          name: "list-drill-tests.arr",
-          file: "list-drill-tests.arr",
-          subs: {}
-        },
-        {
-          name: "gold",
-          file: "list-drill-tests.arr",
-          subs: {
-            "list-drill-code.arr": "0B-_f7M_B5NMiZ1dJclRWMGN3ZTg"
-          }
-        }
-      ],
-      testTarget: {
-        name: "test-suite",
-        target: "list-drill-code.arr",
-        id: "0B-_f7M_B5NMiZ1dJclRWMGN3ZTg"
-      }
-    };
 
     // TODO(all): Move createPCAPI to a require module.
     var storageAPIP = createProgramCollectionAPI(
@@ -52,12 +21,6 @@ $(function() {
         var drive = storageAPI.drive;
         var fileBuilder = storageAPI.fileBuilder;
 
-        /*
-         * req : Thunk(P) -> P
-         * Consumes a thunk returning a promise to a Drive API result and
-         * returns a promise to the result of the API call. Note the API call
-         * must be valid.
-         */
         var nextWait = 0;
         function req(thunk) {
           var deferred = Q.defer();
@@ -79,10 +42,13 @@ $(function() {
           return deferred.promise;
         }
 
-        /*
-         * getFiles : String -> P([File])
-         * Consumes a gDrive ID and produces a promise to an array of files.
-         */
+        function getFile(id) {
+          var filesThunk = function() {
+            return gQ(drive.files.get({fileId: id}));
+          };
+          return req(filesThunk).then(fileBuilder);
+        }
+
         function getFiles(id) {
           var childrenThunk = function() {
             return gQ(drive.children.list({folderId: id}));
@@ -90,20 +56,11 @@ $(function() {
           return req(childrenThunk)
             .then(function(directory) {
               return Q.all(directory.items.map(function(file) {
-                var filesThunk = function() {
-                  return gQ(drive.files.get({fileId: file.id}));
-                };
-                return req(filesThunk)
-                  .then(fileBuilder);
-                }));
-              });
+                return getFile(file.id);
+              }));
+            });
         }
 
-        /*
-         * gatherSubmissions : String -> P(Object(String -> [File]))
-         * Consumes a gDrive ID and produces a promise to an object with
-         * student names as keys and arrays of files as values.
-         */
         function gatherSubmissions(id) {
           var deferred = Q.defer();
           var submissions = {};
@@ -138,184 +95,207 @@ $(function() {
 
           return deferred.promise;
         }
+/*
+        function generateResultJSON(runtime, result) {
+          var o = {};
+          if (runtime.isSuccessResult(result)) {
+            if (runtime.ffi.isRight(result.result)) {
+              
+              var checks = runtime.ffi.toArray(
+                runtime.getField(runtime.getField(result.result, "v")
+                  .val.result.result, "checks"));
+              console.log(checks);
 
-        function addTestSuite(submissions, target) {
-          return req(function() {
-            return gQ(drive.files.get({fileId: target.id}));
-          })
-            .then(fileBuilder)
-            .then(function(file) {
-              var keys = Object.keys(submissions);
-              for (var i = 0; i < keys.length; i++) {
-                var s = submissions[keys[i]];
-                if (s[target.target].getUniqueId !== undefined) {
-                  s["test-suite"] = $.extend({}, file);
-                  s["test-suite"].subs = {};
-                  s["test-suite"].subs[target.target] = s[target.target].getUniqueId();
-                }
-                else {
-                  s["test-suite"] = undefined;
-                }
-
+              function toObject(test) {
+                return {
+                  isSuccess: test.$name == "success",
+                  result: test.$name,
+                  code: runtime.getField(test, "code"),
+                  loc: runtime.getField(test, "loc").dict
+                };
               }
-              return submissions;
-            }).fail(function(f) { console.log(f); });
-        }
 
-        function filterSubmissions(submissions, names) {
-          return Object.keys(submissions).reduce(function(o, i) {
-            o[i] = submissions[i].reduce(function(base, file) {
-              if (names.indexOf(file.getName()) >= 0)
-                base[file.getName()] = file;
-              return base;
-            }, {});
-            return o;
-          }, {});
-        }
+              for (var i = 0; i < checks.length; i++) {
+                o[runtime.getField(checks[i], "name")] =
+                  runtime.ffi.toArray(runtime.getField(
+                      checks[i], "test-results")).map(toObject);
+              }
 
-        function convertSubmissions(submissions, targets) {
-          return Object.keys(submissions).reduce(function(o, i) {
-            o[i] = {};
-            for (var j = 0; j < targets.length; j++) {
-              var target = targets[j];
-              o[i][target.name] = {};
-              o[i][target.name] = $.extend({}, submissions[i][target.file]);
-              o[i][target.name].subs = target.subs;
+              return o;
             }
-            return o;
-          }, {});
-        }
-
-
-        // Not yet used.
-        function runAll(submissions, targets, name) {
-          renderSubmissions(submissions, targets, false);
-
-          $.each(submissions, function(name, targets) {
-            console.log(name, targets);
-          });
-
-          renderSubmissions(submissions, targets, true);
-        }
-
-        function generateRunItemHtml(
-            name, student, submissions, targets) {
-          var item = $("<li class=\"pure-menu-item\"></li>");
-          if (submissions[student][name] !== undefined && submissions[student][name]._googObj !== undefined) {
-            item.append(
-                $("<a class=\"pure-menu-link\" href=\"#\">").text(name)
-              .on("click", function() {
-                renderSubmissions(submissions, targets, false);
-                submissions[student][name].getContents().then(
-                  function(contents) {
-                  return runner.runString(
-                    contents, "", submissions[student][name].subs);
-                  }).then(function(result) {
-                    submissions[student][name].result = result;
-                    return renderSubmissions(submissions, targets, true);
-                  });
-              }));
+            else {
+              console.log("left", result);
+            }
           }
           else {
-            item
-              .addClass("pure-menu-disabled")
-              .append($("<div>")
-              .css("white-space", "nowrap")
-              .text(name));
+            console.log("Not SuccessResult");
           }
-
-          return item;
         }
 
-        function generateRunHtml(submissions, student, targets, enabled) {
-          var t = $("<td><div class=\"pure-menu\"><ul class=\"" +
-              "pure-menu-list\"><li class=\"pure-menu-item " +
-              "pure-menu-allow-hover pure-menu-has-children\">" +
-              "</li></ul></div></td>");
-          if (!enabled) {
-            t.find("li").first()
-              .addClass("pure-menu-disabled").text("Run");
-            return t;
-          }
-          t.find("li").first().html(
-                 "<a href=\"#\" " +
-                 "class=\"pure-menu-link\">Run</a><ul class=\"" +
-                 "pure-menu-children\"></ul></li></ul></div></td>");
-          var st = t.find(".pure-menu-children").first();
-          for (var i = 0; i < targets.length; i++) {
-            var name = targets[i];
-            st.append(
-              generateRunItemHtml(name, student, submissions, targets));
-          }
 
-          return t;
+*/
+        function makeTarget(submissions, target) {
+          return function() {
+            var targetTD = $(this);
+            targetTD.removeClass("def").css("background-color", "#f7cb2a");
+            $("#tbl td.def, #tbl th.def").addClass("dis").removeClass("def");
+            target.eval(function(result) {
+              console.log(result);
+              targetTD.addClass("fin");
+              targetTD.css("background-color", "#30ba40");
+              $("#tbl td.dis, #tbl th.dis").addClass("def").removeClass("dis");
+            });
+          };
         }
 
-        function generateResultHtml(submission, targets) {
-          var t = $("<td>");
+        function runTDs(tds) {
+          var i = 0;
+          var interval = setInterval(function() {
+            if (i < tds.length) {
+              if (tds.eq(i).hasClass("def")) {
+                tds.eq(i).click();
+              }
+              if (tds.eq(i).hasClass("fin")) {
+                i++;
+              }
+            }
+            else {
+              clearInterval(interval);
+            }
+          }, 50);
+        }
 
-          for (var i = 0; i < targets.length; i++) {
-            var name = targets[i];
-            if (name in submission && submission[name] !== null) {
-              if (submission[name] !== undefined) {
-                t.append("<em>" + name + ":</em> " + submission[name].result);
-                if (submission[name].result !== undefined)
-                  console.log(name, submission[name].result);
+        function renderSubmissions(submissions) {
+          var thead = $("#tbl thead tr");
+          thead.append("<th>student</th>");
+          var colspan = 0;
+          for (var student in submissions) {
+            if (submissions.hasOwnProperty(student) &&
+                submissions[student] !== null) {
+              for (; colspan < submissions[student].length; colspan++) {
+                var target = submissions[student][colspan];
+                console.log(colspan); 
+                thead.append($("<th>").text(target.name).addClass("def").click(
+                    function() {
+                      runTDs($(this).parent().parent().parent().find(
+                          "td:not(.nohov):nth-child(" + $(this).index() + ")"));
+                    }));
+              }
+              break;
+            }
+          }
+
+          var tbody = $("#tbl tbody");
+          tbody.css("height", $("#cfg").height() - thead.height());
+          for (var student in submissions) {
+            if (submissions.hasOwnProperty(student)) {
+              var tr = $("<tr>");
+              var td = $("<td>").text(student);
+              if (submissions[student] !== null) {
+                for (var i = 0; i < submissions[student].length; i++) {
+                  tr.append($("<td>").addClass("def").click(
+                        makeTarget(submissions, submissions[student][i])));
+                }
+                tr.prepend(td.addClass("def").click(
+                    function() {
+                      runTDs($(this).parent().find("td:not(:first-child)"));
+                    }));
               }
               else {
-                t.append("<em>" + name + ":</em> undefined");
+                tr.append(td.addClass("nohov"));
+                tr.append($("<td>").attr("colspan", colspan).addClass("nohov"));
               }
+              tbody.append(tr);
             }
           }
-
-          return t;
         }
 
-        function generateSubmissionHtml(submissions, name, targets, enabled) {
-          var t = $("<tr>");
-          t.append("<td>" + name + "</td>");
-
-          t.append(generateRunHtml(
-                submissions, name, targets, enabled));
-          t.append(generateResultHtml(submissions[name], targets));
-
-          return t;
+        function getSubmission(submission, name) {
+          for (var i = 0; i < submission.length; i++) {
+            if (submission[i].getName() == name) {
+              return submission[i];
+            }
+          }
+          
+          return null;
         }
 
-        function renderSubmissions(submissions, targets, enabled) {
-          $("#students-loading").hide();
-          var t = $("#students");
-          t.html("");
+        function makeRunner(fileObj, fileName, fileID) {
+          if (fileObj !== null) {
+            return function(thunk) {
+              return fileObj.getContents().then(function(contents) {
+                var subs = {};
+                subs[fileName] = fileID;
+                return runner.runString(contents, "", subs);
+              }).then(thunk);
+            };
+          }
+          else {
+            return null;
+          }
+        }
 
-          t.append(
-              "<thead><tr><th>Student</th><th>Files</th>" +
-              "<th>Results</th></tr></thead>");
+        function loadAndRenderSubmissions() {
+          $("#cfg-container").hide();
+          $(".pure-u-1").show();
 
-          $.each(Object.keys(submissions).sort(), function(_, name) {
-            t.append(generateSubmissionHtml(
-                submissions, name, targets, enabled));
+          var assignmentID = $("#id").val();
+          var implName = $("#implementation").val();
+          var testName = $("#test").val();
+          var suiteID = $("#suite").val();
+          var goldID = $("#gold").val();
+          var coals;
+          if ($("#coals").val() === "") {
+            coals = [];
+          }
+          else {
+            coals = $("#coals").val().split("\n").map(function(coal) {
+              return coal.split(":");
+            });
+          }
+
+          getFile(suiteID).then(function(suiteSubmission) {
+            function toTargets(submission) {
+              var targets = [];
+              var implSubmission = getSubmission(submission, implName);
+              var testSubmission = getSubmission(submission, testName);
+              if (testSubmission !== null && implSubmission !== null) {
+                targets.push({
+                  name: "test",
+                  eval: makeRunner(
+                    suiteSubmission, implName, implSubmission.getUniqueId())
+                });
+                targets.push({
+                  name: "gold",
+                  eval: makeRunner(testSubmission, implName, goldID)
+                });
+                for (var i = 0; i < coals.length; i++) {
+                  targets.push({
+                    name: "coal-" + i,
+                    eval: makeRunner(testSubmission, coals[i][0], coals[i][1])
+                  });
+                }
+                return targets;
+              }
+              else {
+                return null;
+              }
+            }
+
+            gatherSubmissions(assignmentID).then(function(submissions) {
+              for (var student in submissions) {
+                if (submissions.hasOwnProperty(student)) {
+                  submissions[student] = toTargets(submissions[student]);
+                }
+              }
+
+              renderSubmissions(submissions);
+            }).fail(function(f){console.log(f);});
           });
         }
 
-        var files = config.files.sort();
-        var targets = config.targets.map(function(target) {
-          return target.name;
-        });
-        gatherSubmissions(config.assignment).then(function(submissions) {
-          var submissions = filterSubmissions(submissions, files);
-          submissions = convertSubmissions(submissions, config.targets);
-          if (config.testTarget !== undefined) {
-            addTestSuite(submissions, config.testTarget).then(
-              function(submissions) {
-                targets.push("test-suite");
-                renderSubmissions(submissions, targets, true);
-              })
-            .fail(function(f) { console.log(f) });
-          }
-          else {
-            renderSubmissions(submissions, targets, true);
-          }
-        }).fail(function(f) { console.log(f); });
+        $("#load").click(loadAndRenderSubmissions);
+
       });
   });
 });

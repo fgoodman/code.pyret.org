@@ -68,7 +68,7 @@ define([
                 return run(
                     gmf(compileLib, "string-locator").app(name, str), subs);
               }
-              return { run: run, runString: runString };
+              return { run: run, runString: runString, runtime: runtime };
             });
           }, function(result) {
             if(runtime.isFailureResult(result)) {
