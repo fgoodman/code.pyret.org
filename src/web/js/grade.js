@@ -167,34 +167,39 @@ $(function() {
 
         function renderSubmissions(submissions) {
           var thead = $("#tbl thead tr");
-          thead.append("<th>student</th>");
           var colspan = 0;
           for (var student in submissions) {
             if (submissions.hasOwnProperty(student) &&
                 submissions[student] !== null) {
               for (; colspan < submissions[student].length; colspan++) {
                 var target = submissions[student][colspan];
-                console.log(colspan); 
                 thead.append($("<th>").text(target.name).addClass("def").click(
                     function() {
+                      var idx = $(this).index() + 1;
                       runTDs($(this).parent().parent().parent().find(
-                          "td:not(.nohov):nth-child(" + $(this).index() + ")"));
+                          "td:not(.nohov):nth-child(" + idx + ")"));
                     }));
               }
               break;
             }
           }
+          thead.prepend($("<th>").text("student").click(function () {
+            runTDs($(this).parent().parent().parent().find("td:not(.nohov):not(:first-child)"));
+          }).addClass("def"));
 
           var tbody = $("#tbl tbody");
           tbody.css("height", $("#cfg").height() - thead.height());
-          for (var student in submissions) {
+          var keys = Object.keys(submissions);
+          keys.sort();
+          for (var i = 0; i < keys.length; i++) {
+            var student = keys[i];
             if (submissions.hasOwnProperty(student)) {
               var tr = $("<tr>");
               var td = $("<td>").text(student);
               if (submissions[student] !== null) {
-                for (var i = 0; i < submissions[student].length; i++) {
+                for (var j = 0; j < submissions[student].length; j++) {
                   tr.append($("<td>").addClass("def").click(
-                        makeTarget(submissions, submissions[student][i])));
+                        makeTarget(submissions, submissions[student][j])));
                 }
                 tr.prepend(td.addClass("def").click(
                     function() {
