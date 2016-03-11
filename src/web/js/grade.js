@@ -134,15 +134,82 @@ $(function() {
 
 
 */
-        function makeTarget(submissions, target) {
+        function generateJSONFile(result) {
+          var o = {};
+
+          var runtime = runner.runtime;
+          if (runner.runtime.isSuccessResult(result)) {
+            if (runtime.ffi.isRight(result.result)) {
+              
+              var checks = runtime.ffi.toArray(
+                runtime.getField(runtime.getField(result.result, "v")
+                  .val.result.result, "checks"));
+
+              function toObject(test) {
+                return {
+                  isSuccess: test.$name == "success",
+                  result: test.$name,
+                  code: runtime.getField(test, "code"),
+                  loc: runtime.getField(test, "loc").dict
+                };
+              }
+
+              for (var k = 0; k < checks.length; k++) {
+                o[runtime.getField(checks[k], "name")] =
+                  runtime.ffi.toArray(runtime.getField(
+                      checks[k], "test-results")).map(toObject);
+              }
+
+              return o;
+            }
+            else {
+              console.log("left", result);
+              return {};
+            }
+          }
+          else {
+            console.log("failure result", result);
+          }
+        }
+
+        function generateJSON(submissions) {
+          var blob = {};
+          console.log(submissions);
+          var sk = Object.keys(submissions);
+          sk.sort();
+          for (var i = 0; i < sk.length; i++) {
+            var student = {};
+            var s = submissions[sk[i]];
+            if (submissions.hasOwnProperty(sk[i]) && s !== null) {
+              var fk = Object.keys(s);
+              fk.sort();
+              for (var j = 0; j < fk.length; j++) {
+                var f = s[fk[j]];
+                if (f.result !== undefined) {
+                  student[s[fk[j]].name] = generateJSONFile(f.result);
+                }
+              }
+            }
+            blob[sk[i]] = student;
+          }
+          $("#out").text(JSON.stringify(blob, null, "\t"));
+        }
+
+        function makeTarget(target) {
           return function() {
             var targetTD = $(this);
             targetTD.removeClass("def").css("background-color", "#f7cb2a");
             $("#tbl td.def, #tbl th.def").addClass("dis").removeClass("def");
             target.eval(function(result) {
-              console.log(result);
+              if (runner.runtime.isSuccessResult(result)) {
+                targetTD.css("background-color", "#30ba40");
+              }
+              else {
+                targetTD.css("background-color", "#de1d10");
+              }
+              console.log("Result:", result);
+              target.result = result;
               targetTD.addClass("fin");
-              targetTD.css("background-color", "#30ba40");
               $("#tbl td.dis, #tbl th.dis").addClass("def").removeClass("dis");
             });
           };
@@ -165,15 +232,16 @@ $(function() {
           }, 50);
         }
 
-        function renderSubmissions(submissions) {
-          var thead = $("#tbl thead tr");
+        function renderSubmissionsHeader(thead, submissions) {
           var colspan = 0;
           for (var student in submissions) {
             if (submissions.hasOwnProperty(student) &&
                 submissions[student] !== null) {
               for (; colspan < submissions[student].length; colspan++) {
                 var target = submissions[student][colspan];
-                thead.append($("<th>").text(target.name).addClass("def").click(
+                thead.append($("<th>").html("<div><span>" + target.name +
+                      "</span></div>")
+                    .addClass("def").click(
                     function() {
                       var idx = $(this).index() + 1;
                       runTDs($(this).parent().parent().parent().find(
@@ -183,12 +251,14 @@ $(function() {
               break;
             }
           }
-          thead.prepend($("<th>").text("student").click(function () {
+          thead.prepend($("<th>").html("<div><span>student</span></div>").click(
+                function () {
             runTDs($(this).parent().parent().parent().find("td:not(.nohov):not(:first-child)"));
           }).addClass("def"));
+          return colspan;
+        }
 
-          var tbody = $("#tbl tbody");
-          tbody.css("height", $("#cfg").height() - thead.height());
+        function renderSubmissionsRows(tbody, colspan, submissions) {
           var keys = Object.keys(submissions);
           keys.sort();
           for (var i = 0; i < keys.length; i++) {
@@ -199,7 +269,7 @@ $(function() {
               if (submissions[student] !== null) {
                 for (var j = 0; j < submissions[student].length; j++) {
                   tr.append($("<td>").addClass("def").click(
-                        makeTarget(submissions, submissions[student][j])));
+                        makeTarget(submissions[student][j])));
                 }
                 tr.prepend(td.addClass("def").click(
                     function() {
@@ -213,6 +283,15 @@ $(function() {
               tbody.append(tr);
             }
           }
+        }
+
+        function renderSubmissions(submissions) {
+          var thead = $("#tbl thead tr");
+          var colspan = renderSubmissionsHeader(thead, submissions);
+
+          var tbody = $("#tbl tbody");
+          tbody.css("height", $("#cfg").height() - thead.height());
+          renderSubmissionsRows(tbody, colspan, submissions);
         }
 
         function getSubmission(submission, name) {
@@ -240,9 +319,9 @@ $(function() {
           }
         }
 
-        function loadAndRenderSubmissions() {
+        function loadAndRenderSubmissions(e) {
+          e.preventDefault();
           $("#cfg-container").hide();
-          $(".pure-u-1").show();
 
           var assignmentID = $("#id").val();
           var implName = $("#implementation").val();
@@ -295,11 +374,15 @@ $(function() {
               }
 
               renderSubmissions(submissions);
+
+              $("#frm").submit(function() {
+                generateJSON(submissions);
+              }).show();
             }).fail(function(f){console.log(f);});
           });
         }
 
-        $("#load").click(loadAndRenderSubmissions);
+        $("#cfg").on("submit", loadAndRenderSubmissions);
 
       });
   });
