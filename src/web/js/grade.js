@@ -95,45 +95,7 @@ $(function() {
 
           return deferred.promise;
         }
-/*
-        function generateResultJSON(runtime, result) {
-          var o = {};
-          if (runtime.isSuccessResult(result)) {
-            if (runtime.ffi.isRight(result.result)) {
-              
-              var checks = runtime.ffi.toArray(
-                runtime.getField(runtime.getField(result.result, "v")
-                  .val.result.result, "checks"));
-              console.log(checks);
 
-              function toObject(test) {
-                return {
-                  isSuccess: test.$name == "success",
-                  result: test.$name,
-                  code: runtime.getField(test, "code"),
-                  loc: runtime.getField(test, "loc").dict
-                };
-              }
-
-              for (var i = 0; i < checks.length; i++) {
-                o[runtime.getField(checks[i], "name")] =
-                  runtime.ffi.toArray(runtime.getField(
-                      checks[i], "test-results")).map(toObject);
-              }
-
-              return o;
-            }
-            else {
-              console.log("left", result);
-            }
-          }
-          else {
-            console.log("Not SuccessResult");
-          }
-        }
-
-
-*/
         function generateJSONFile(result) {
           var o = {};
 
@@ -154,6 +116,7 @@ $(function() {
                 };
               }
 
+              o.isError = false;
               for (var k = 0; k < checks.length; k++) {
                 o[runtime.getField(checks[k], "name")] =
                   runtime.ffi.toArray(runtime.getField(
@@ -163,12 +126,19 @@ $(function() {
               return o;
             }
             else {
+              // TODO: identify this case and handle it
               console.log("left", result);
               return {};
             }
           }
           else {
             console.log("failure result", result);
+            return {
+              isError: true,
+              errorName: result.exn.exn.$name,
+              stack: result.exn.stack,
+              loc: runtime.getField(result.exn.exn, "loc").dict
+            };
           }
         }
 
