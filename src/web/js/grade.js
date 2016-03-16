@@ -173,9 +173,19 @@ $(function() {
             target.eval(function(result) {
               if (runner.runtime.isSuccessResult(result)) {
                 targetTD.css("background-color", "#30ba40");
+                if (typeof(result.exn) === "undefined") {
+                  targetTD.attr("title", "Run (compile, runtime success)");
+                }
+                else {
+                  var r = result.exn.exn.$name;
+                  targetTD.attr("title",
+                    "Run (compile success, runtime error: " + r + ")");
+                }
               }
               else {
                 targetTD.css("background-color", "#de1d10");
+                var r = result.exn.exn.$name;
+                targetTD.attr("title", "Run (compile error: " + r + ")");
               }
               console.log("Result:", result);
               target.result = result;
@@ -210,7 +220,8 @@ $(function() {
               for (; colspan < submissions[student].length; colspan++) {
                 var target = submissions[student][colspan];
                 thead.append($("<th>").html("<div><span>" + target.name +
-                      "</span></div>")
+                      "</span></div>").addClass("tooltip")
+                    .attr("title", "Run All for '" + target.name + "'")
                     .addClass("def").click(
                     function() {
                       var idx = $(this).index() + 1;
@@ -224,7 +235,7 @@ $(function() {
           thead.prepend($("<th>").html("<div><span>student</span></div>").click(
                 function () {
             runTDs($(this).parent().parent().parent().find("td:not(.nohov):not(:first-child)"));
-          }).addClass("def"));
+          }).addClass("def").addClass("tooltip").attr("title", "Run All"));
           return colspan;
         }
 
@@ -235,11 +246,14 @@ $(function() {
             var student = keys[i];
             if (submissions.hasOwnProperty(student)) {
               var tr = $("<tr>");
-              var td = $("<td>").text(student);
+              var td = $("<td>").text(student).addClass("tooltip")
+                .attr("title", "Run All for '" + student + "'");
               if (submissions[student] !== null) {
                 for (var j = 0; j < submissions[student].length; j++) {
                   tr.append($("<td>").addClass("def").click(
-                        makeTarget(submissions[student][j])));
+                        makeTarget(submissions[student][j]))
+                      .addClass("tooltip")
+                      .attr("title", "Run"));
                 }
                 tr.prepend(td.addClass("def").click(
                     function() {
@@ -353,6 +367,22 @@ $(function() {
         }
 
         $("#cfg").on("submit", loadAndRenderSubmissions);
+
+        $(document).on("mouseover", ".tooltip", function() {
+          var title = $(this).attr("title");
+          $(this).data("tipText", title).removeAttr("title");
+          $("<p class=\"tt\"></p>")
+          .text(title)
+          .appendTo("body")
+          .fadeIn(0);
+          }).on("mouseout", ".tooltip", function () {
+            $(this).attr("title", $(this).data("tipText"));
+            $(".tt").remove();
+          }).on("mousemove", ".tooltip", function(e) {
+            var x = e.pageX;
+            var y = e.pageY;
+            $(".tt").css({ top: y, left: x });
+        });
 
       });
   });
